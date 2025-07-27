@@ -1,0 +1,73 @@
+{
+  "name": "custom-captcha",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "A customizable sliding puzzle captcha component for React applications with server-side validation",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./client": {
+      "import": "./dist/client/index.js",
+      "types": "./dist/client/index.d.ts"
+    },
+    "./server": {
+      "import": "./dist/server/index.js",
+      "types": "./dist/server/index.d.ts"
+    }
+  },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "captcha",
+    "react",
+    "puzzle",
+    "security",
+    "bot-protection",
+    "form-validation",
+    "sliding-puzzle",
+    "typescript",
+    "next.js captcha",
+    "react captcha"
+  ],
+  "author": "Murtaza Baanihali",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/murtazabaanihali/custom-captcha.git"
+  },
+  "homepage": "https://github.com/murtazabaanihali/custom-captcha#readme",
+  "bugs": {
+    "url": "https://github.com/murtazabaanihali/custom-captcha/issues"
+  },
+  "peerDependencies": {
+    "react": ">=16.8.0",
+    "react-dom": ">=16.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "@types/react": "^18.0.15",
+    "@types/react-dom": "^18.0.6",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "typescript": "^4.7.4",
+    "@vitejs/plugin-react": "^4.7.0",
+    "vite": "^7.0.6"
+  },
+  "dependencies": {
+    "sharp": "^0.34.3",
+    "server-only": "^0.0.1"
+  }
+}

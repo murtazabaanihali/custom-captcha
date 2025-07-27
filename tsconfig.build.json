@@ -1,0 +1,24 @@
+
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "removeComments": false,
+    "emitDeclarationOnly": false,
+    "noEmit": false
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "src/App.tsx",
+    "src/main.tsx",
+    "src/vite.config.js",
+    "**/*.test.*",
+    "**/*.spec.*",
+    "dist"
+  ]
+}
