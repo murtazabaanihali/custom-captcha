@@ -47,6 +47,11 @@ This captcha system follows a secure workflow:
 
 import { useState } from 'react';
 import CaptchaComponent from 'custom-captcha/client';
+import { 
+  createCaptcha, 
+  verifyCaptcha, 
+  signup 
+} from '@/actions/auth';
 
 export default function SignupForm() {
   const [loading, setLoading] = useState(false);
@@ -60,12 +65,9 @@ export default function SignupForm() {
   const handleRefresh = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/captcha/create', { 
-        method: 'POST' 
-      });
-      const data = await response.json();
-      setCaptchaId(data.id);
-      return data;
+      const captcha = await createCaptcha();
+      setCaptchaId(captcha.id);
+      return captcha;
     } finally {
       setLoading(false);
     }
@@ -74,12 +76,7 @@ export default function SignupForm() {
   const handleVerify = async (id: string, value: string) => {
     setLoading(true);
     try {
-      const response = await fetch('/api/captcha/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, value })
-      });
-      return await response.json();
+      return await verifyCaptcha(id, value);
     } finally {
       setLoading(false);
     }
@@ -88,20 +85,15 @@ export default function SignupForm() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const response = await fetch('/api/auth/signup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        ...formData, 
-        captchaId 
-      })
+    const result = await signup({
+      ...formData,
+      captchaId
     });
 
-    if (response.ok) {
+    if (result.success) {
       alert('Signup successful!');
     } else {
-      const error = await response.json();
-      alert(error.message);
+      alert(result.message);
     }
   };
 
@@ -161,50 +153,41 @@ export default function SignupForm() {
 }
 ```
 
-#### API Routes
+#### Next JS Server Actions
 
-**Create Captcha (`app/api/captcha/create/route.ts`)**
+**Server Actions (`app/actions/auth.ts`)**
 
 ```typescript
-import { NextRequest, NextResponse } from 'next/server';
-import { createCaptcha } from 'custom-captcha/server';
+'use server';
+
+import { 
+  createCaptcha as createCaptchaLib, 
+  verifyCaptcha as verifyCaptchaLib,
+  hasCaptchaBeenVerified 
+} from 'custom-captcha/server';
 import Redis from 'ioredis';
+import bcrypt from 'bcryptjs';
 
-const redis = new Redis(process.env.REDIS_URL);
+const redis = new Redis(process.env.REDIS_URL!);
 
-export async function POST(request: NextRequest) {
+export async function createCaptcha() {
   try {
-    const captcha = await createCaptcha({
+    const captcha = await createCaptchaLib({
       fallbackImgPath: './public/fallback.jpg',
       storeCaptchaId: async (id, value) => {
         await redis.setex(`captcha:${id}`, 600, value); // 10 minute TTL
       }
     });
     
-    return NextResponse.json(captcha);
+    return captcha;
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to create captcha' }, 
-      { status: 500 }
-    );
+    throw new Error('Failed to create captcha');
   }
 }
-```
 
-**Verify Captcha (`app/api/captcha/verify/route.ts`)**
-
-```typescript
-import { NextRequest, NextResponse } from 'next/server';
-import { verifyCaptcha } from 'custom-captcha/server';
-import Redis from 'ioredis';
-
-const redis = new Redis(process.env.REDIS_URL);
-
-export async function POST(request: NextRequest) {
+export async function verifyCaptcha(id: string, value: string) {
   try {
-    const { id, value } = await request.json();
-    
-    const result = await verifyCaptcha({
+    const result = await verifyCaptchaLib({
       captchaId: id,
       value,
       getCaptchaValue: async (id) => {
@@ -215,65 +198,46 @@ export async function POST(request: NextRequest) {
       }
     });
     
-    return NextResponse.json(result);
+    return result;
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Verification failed' }, 
-      { status: 500 }
-    );
+    return { success: false, error: 'Verification failed' };
   }
 }
-```
 
-**Signup Route (`app/api/auth/signup/route.ts`)**
-
-```typescript
-import { NextRequest, NextResponse } from 'next/server';
-import { hasCaptchaBeenVerified } from 'custom-captcha/server';
-import Redis from 'ioredis';
-import bcrypt from 'bcryptjs';
-
-const redis = new Redis(process.env.REDIS_URL);
-
-export async function POST(request: NextRequest) {
+export async function signup(data: {
+  email: string;
+  password: string;
+  name: string;
+  captchaId: string;
+}) {
   try {
-    const { email, password, name, captchaId } = await request.json();
+    const { email, password, name, captchaId } = data;
     
     // Verify captcha first
     const captchaValue = await redis.get(`captcha:${captchaId}`);
     
     if (!captchaValue || !(await hasCaptchaBeenVerified(captchaValue))) {
-      return NextResponse.json(
-        { message: 'Please complete the captcha verification' }, 
-        { status: 400 }
-      );
+      return {
+        success: false,
+        message: 'Please complete the captcha verification'
+      };
     }
 
-    // Check if user already exists
-    const existingUser = await getUserByEmail(email);
-    if (existingUser) {
-      return NextResponse.json(
-        { message: 'User already exists' }, 
-        { status: 400 }
-      );
-    }
-
-    // Hash password and create user
-    const hashedPassword = await bcrypt.hash(password, 12);
-    const user = await createUser({ email, password: hashedPassword, name });
+    //... Do your stuff ....
     
-    // Clean up captcha, it will work without it also but it is good to remove it
+    // Clean up captcha
     await redis.del(`captcha:${captchaId}`);
 
-    return NextResponse.json({ 
-      message: 'User created successfully', 
-      userId: user.id 
-    });
+    return {
+      success: true,
+      message: 'User created successfully',
+      userId: user.id
+    };
   } catch (error) {
-    return NextResponse.json(
-      { message: 'Internal server error' }, 
-      { status: 500 }
-    );
+    return {
+      success: false,
+      message: 'Internal server error'
+    };
   }
 }
 ```
